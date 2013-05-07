@@ -1,0 +1,30 @@
+#!/bin/bash
+
+if [[ $# != 2 ]]
+then
+	echo "Usage: $0 app.xml output.apk"
+	exit 1
+fi
+
+apkdir=$(dirname $(readlink -f "$0"))
+airtools="$apkdir/.."
+
+xml="$1"
+apk="$2"
+
+adt=$apkdir/airsdk/adt
+cert=$apkdir/cert.pfx
+storepass=$(cat $apkdir/storepass.txt)
+files=$($airtools/appcontents.py "$xml")
+#files="game.swf 36x36-border.png 48x48-border.png 72x72-border.png"
+
+airversion=$($adt -version)
+
+#cert=android-cert.pfx
+
+target=apk
+#target=apk-captive-runtime
+
+#AMAZON="-airDownloadURL http://www.amazon.com/gp/mas/dl/android?p=com.adobe.air"
+
+"$adt" -package -target $target $AMAZON -storetype pkcs12 -keystore "$cert" -storepass "$storepass" "$apk" "$xml" $files

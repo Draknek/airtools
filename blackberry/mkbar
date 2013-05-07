@@ -1,0 +1,74 @@
+#!/bin/bash
+
+# Connection details for Playbook
+IP=169.254.0.1
+PASSWORD=g
+
+if [[ $# != 2 ]]
+then
+	echo "Usage: $0 app.xml output.bar"
+	echo "       $0 -install file.bar"
+	echo "Note: requires two files to be in current dir:"
+	echo "	blackberry-tablet.xml"
+	echo "	blackberry-tablet-icon.png"
+	exit 1
+fi
+
+platformdir=$(dirname $(readlink "$0"))
+airtools="$platformdir/.."
+BINDIR="$platformdir/airsdk"
+
+
+XMLFILE="$1"
+BARFILE="$2"
+
+
+
+if [[ "$XMLFILE" == "-install" ]]
+then
+	$BINDIR/blackberry-deploy -installApp -launchApp -package $BARFILE -device $IP -password $PASSWORD
+	exit
+elif [[ ! -f "$XMLFILE" ]]
+then
+	echo "$XMLFILE does not exist"
+	exit 1
+fi
+
+if [[ ! -f "$BARFILE" ]]
+then
+	echo "$BARFILE does not exist"
+	exit 1
+fi
+
+
+
+storepass=$(cat $platformdir/storepass.txt)
+cskpass=$(cat $platformdir/cskpass.txt)
+files=$($airtools/appcontents.py "$XMLFILE")
+
+airversion=$($BINDIR/adt -version)
+
+
+KEYFILE="$platformdir/key.p12"
+
+
+
+rm -rf $BARFILE
+
+
+touch build.num
+buildid=$(cat build.num)
+if [[ -z "$buildid" ]]
+then
+	buildid="0"
+fi
+echo $(( buildid+1 )) > build.num
+
+
+$BINDIR/blackberry-airpackager -buildId $buildid -package $BARFILE "$XMLFILE" $files blackberry-tablet-icon.png
+
+$BINDIR/blackberry-signer -verbose -cskpass $cskpass -keystore $KEYFILE -storepass $storepass $BARFILE RDK
+
+$BINDIR/blackberry-signer -keystore $KEYFILE -storepass $storepass $BARFILE author
+
+$BINDIR/blackberry-deploy -installApp -launchApp -package $BARFILE -device $IP -password $PASSWORD
