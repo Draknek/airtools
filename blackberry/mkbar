@@ -4,47 +4,80 @@
 IP=169.254.0.1
 PASSWORD=g
 
-if [[ $# != 2 ]]
+if [[ $# == 0 ]]
 then
-	echo "Usage: $0 app.xml output.bar"
+	echo "Usage: $0 app.xml output.bar file.swf thumb.png"
 	echo "       $0 -install file.bar"
-	echo "Note: requires two files to be in current dir:"
-	echo "	blackberry-tablet.xml"
-	echo "	blackberry-tablet-icon.png"
+	echo "Note: thumbnail should be 114x114 pixels"
 	exit 1
 fi
 
-platformdir=$(dirname $(readlink "$0"))
+platformdir=$(dirname $(readlink -f "$0"))
 airtools="$platformdir/.."
 BINDIR="$platformdir/airsdk"
 
 
 XMLFILE="$1"
 BARFILE="$2"
+SWFFILE="$3"
+THUMBNAIL="$4"
 
+
+ERROR=0
+
+
+function checkfile {
+	if [[ -z "$1" ]]
+	then
+		echo "$2 file not given"
+		ERROR=1
+	elif [[ ! -f "$1" ]]
+	then
+		echo "$1 does not exist"
+		ERROR=1
+	fi
+}
 
 
 if [[ "$XMLFILE" == "-install" ]]
 then
 	$BINDIR/blackberry-deploy -installApp -launchApp -package $BARFILE -device $IP -password $PASSWORD
 	exit
-elif [[ ! -f "$XMLFILE" ]]
+fi
+
+checkfile "$XMLFILE" "xml"
+checkfile "$SWFFILE" "swf"
+checkfile "$THUMBNAIL" "thumbnail"
+
+if [[ "$ERROR" != 0 ]]
 then
-	echo "$XMLFILE does not exist"
 	exit 1
 fi
 
-if [[ ! -f "$BARFILE" ]]
-then
-	echo "$BARFILE does not exist"
-	exit 1
-fi
+
+OUTPUTDIR=$(dirname $(readlink -f "$BARFILE"))
+BARFILE=$(basename "$BARFILE")
+BUILDNUMFILE="$OUTPUTDIR/build.num"
+
+
+TMPDIR=$(mktemp -d)
+
+cp "$platformdir/blackberry-tablet.xml" "$TMPDIR/blackberry-tablet.xml"
+cp "$THUMBNAIL" "$TMPDIR/blackberry-tablet-icon.png"
+cp "$SWFFILE" "$TMPDIR"
+cp "$XMLFILE" "$TMPDIR"
+
+SWFFILE=$(basename "$SWFFILE")
+XMLFILE=$(basename "$XMLFILE")
+
+
+cd $TMPDIR
 
 
 
 storepass=$(cat $platformdir/storepass.txt)
 cskpass=$(cat $platformdir/cskpass.txt)
-files=$($airtools/appcontents.py "$XMLFILE")
+files="$SWFFILE blackberry-tablet-icon.png"
 
 airversion=$($BINDIR/adt -version)
 
@@ -53,22 +86,24 @@ KEYFILE="$platformdir/key.p12"
 
 
 
-rm -rf $BARFILE
 
-
-touch build.num
-buildid=$(cat build.num)
+touch "$BUILDNUMFILE"
+buildid=$(cat "$BUILDNUMFILE")
 if [[ -z "$buildid" ]]
 then
 	buildid="0"
 fi
-echo $(( buildid+1 )) > build.num
+echo $(( buildid+1 )) > "$BUILDNUMFILE"
 
 
-$BINDIR/blackberry-airpackager -buildId $buildid -package $BARFILE "$XMLFILE" $files blackberry-tablet-icon.png
+$BINDIR/blackberry-airpackager -buildId $buildid -package $BARFILE "$XMLFILE" $files
 
 $BINDIR/blackberry-signer -verbose -cskpass $cskpass -keystore $KEYFILE -storepass $storepass $BARFILE RDK
 
 $BINDIR/blackberry-signer -keystore $KEYFILE -storepass $storepass $BARFILE author
 
 $BINDIR/blackberry-deploy -installApp -launchApp -package $BARFILE -device $IP -password $PASSWORD
+
+cp "$BARFILE" "$OUTPUTDIR"
+
+rm -rf "$TMPDIR"
