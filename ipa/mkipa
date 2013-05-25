@@ -1,0 +1,139 @@
+#!/bin/bash
+
+if [[ $# == 0 ]]
+then
+	echo "Usage: $0 app.xml output.ipa BUILDTYPE file.swf imagedir"
+	echo "       BUILDTYPE: release | test | debug"
+	echo "Or     $0 -install file.ipa"
+	exit 1
+fi
+
+platformdir=$(dirname $(readlink -f "$0"))
+airtools="$platformdir/.."
+BINDIR="$platformdir/airsdk"
+
+XMLFILE="$1"
+IPAFILE="$2"
+BUILDTYPE="$3"
+SWFFILE="$4"
+IMAGEDIR="$5"
+
+
+ERROR=0
+
+
+function checkfile {
+	if [[ -z "$1" ]]
+	then
+		echo "$2 path not given"
+		ERROR=1
+	elif [[ ! -f "$1" ]]
+	then
+		echo "$1 does not exist"
+		ERROR=1
+	fi
+}
+
+
+if [[ "$XMLFILE" == "-install" ]]
+then
+	$BINDIR/adt.bat -installApp -platform ios -package $IPAFILE
+	exit
+fi
+
+if [[ "$BUILDTYPE" == "release" ]]
+then
+	provision="$platformdir/Release.mobileprovision"
+	airtarget=ipa-app-store
+elif [[ "$BUILDTYPE" == "test" ]] 
+then
+	provision="$platformdir/AdHoc.mobileprovision"
+	airtarget=ipa-ad-hoc
+elif [[ "$BUILDTYPE" == "debug" ]] 
+then
+	provision="$platformdir/AdHoc.mobileprovision"
+	airtarget=ipa-test-interpreter
+else
+	echo "BUILDTYPE is not one of release|test|debug"
+	ERROR=1
+fi
+
+checkfile "$XMLFILE" "xml"
+checkfile "$SWFFILE" "swf"
+
+if [[ "$ERROR" != 0 ]]
+then
+	exit 1
+fi
+
+
+OUTPUTDIR=$(dirname $(readlink -f "$IPAFILE"))
+IPAFILE=$(basename "$IPAFILE")
+
+TMPDIR=$(mktemp -d)
+
+
+cp "$SWFFILE" "$TMPDIR"
+cp "$XMLFILE" "$TMPDIR"
+cp "$provision" "$TMPDIR"
+
+SWFFILE=$(basename "$SWFFILE")
+XMLFILE=$(basename "$XMLFILE")
+provision=$(basename "$provision")
+
+
+cp "$platformdir/distribution.p12" "$TMPDIR/key.p12"
+key="key.p12"
+
+
+storepass=$(cat $platformdir/storepass.txt)
+files="$SWFFILE"
+
+
+### COPY IMAGES
+
+THUMBSIZES="29 48 50 57 58 72 100 114 144 512 1024"
+
+cd "$IMAGEDIR"
+
+for size in $THUMBSIZES
+do
+	if [[ ! -f "thumb-$size.png" ]]
+	then
+		echo "${size}x${size} thumbnail does not exist"
+		ERROR=1
+	else
+		cp "thumb-$size.png" "$TMPDIR/${size}x${size}.png"
+		files="$files ${size}x${size}.png"
+	fi
+done
+
+for loadingimage in Default*.png
+do
+	cp "$loadingimage" "$TMPDIR"
+	files="$files $loadingimage"
+done
+
+
+if [[ "$ERROR" != 0 ]]
+then
+	rm -rf "$TMPDIR"
+	exit 1
+fi
+
+
+
+cd "$TMPDIR"
+
+
+echo "Building $IPAFILE"
+
+time $BINDIR/adt.bat -package -target $airtarget -provisioning-profile $provision -keystore $key -storepass $storepass -storetype pkcs12 $IPAFILE $XMLFILE $files
+
+echo "Syncing to device"
+
+$BINDIR/adt.bat -installApp -platform ios -package $IPAFILE
+
+cp "$IPAFILE" "$OUTPUTDIR"
+
+rm -rf "$TMPDIR"
