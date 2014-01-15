@@ -2,8 +2,9 @@
 
 if [[ $# == 0 ]]
 then
-	echo "Usage: $0 app.xml output.ipa BUILDTYPE file.swf imagedir"
+	echo "Usage: $0 app.xml output.ipa BUILDTYPE file.swf IMAGES"
 	echo "       BUILDTYPE: release | test | debug"
+	echo "       IMAGES: imagedir | image1 image2 image3"
 	echo "Or     $0 -install file.ipa"
 	exit 1
 fi
@@ -92,27 +93,67 @@ files="$SWFFILE"
 
 ### COPY IMAGES
 
-THUMBSIZES="29 48 50 57 58 72 100 114 144 512 1024"
+if [[ -d "$IMAGEDIR" ]]
+then
+	THUMBSIZES="29 48 50 57 58 72 100 114 144 512 1024"
 
-cd "$IMAGEDIR"
+	cd "$IMAGEDIR"
 
-for size in $THUMBSIZES
-do
-	if [[ ! -f "thumb-$size.png" ]]
-	then
-		echo "${size}x${size} thumbnail does not exist"
-		ERROR=1
-	else
-		cp "thumb-$size.png" "$TMPDIR/${size}x${size}.png"
-		files="$files ${size}x${size}.png"
-	fi
-done
+	for size in $THUMBSIZES
+	do
+		if [[ -f "thumb-$size.png" ]]
+		then
+			cp "thumb-$size.png" "$TMPDIR/${size}x${size}.png"
+			files="$files ${size}x${size}.png"
+		elif [[ -f "thumb$size.png" ]]
+		then
+			cp "thumb$size.png" "$TMPDIR/${size}x${size}.png"
+			files="$files ${size}x${size}.png"
+		elif [[ -f "${size}x${size}.png" ]]
+		then
+			cp "${size}x${size}.png" "$TMPDIR/${size}x${size}.png"
+			files="$files ${size}x${size}.png"
+		elif [[ "$size" == "512" && -f "iTunesArtwork.png" ]]
+		then
+			cp "iTunesArtwork.png" "$TMPDIR/${size}x${size}.png"
+			files="$files ${size}x${size}.png"
+		else
+			echo "${size}x${size} thumbnail does not exist"
+			ERROR=1
+		fi
+	done
 
-for loadingimage in Default*.png
-do
-	cp "$loadingimage" "$TMPDIR"
-	files="$files $loadingimage"
-done
+	for loadingimage in Default*.png
+	do
+		if [[ -f "$loadingimage" ]]
+		then
+			cp "$loadingimage" "$TMPDIR"
+			files="$files $loadingimage"
+		else
+			echo "$loadingimage does not exist"
+			ERROR=1
+		fi
+	done
+else
+	argsarray=($@)
+	argnumber=4
+
+	while [[ "$argnumber" -lt "$#" ]]
+	do
+		imagefile="${argsarray[$argnumber]}"
+
+		if [[ -f "$imagefile" ]]
+		then
+			cp "$imagefile" "$TMPDIR"
+			files="$files $imagefile"
+		else
+			echo "$imagefile does not exist"
+			ERROR=1
+		fi
+
+		((argnumber++))
+	done
+fi
 
 
 if [[ "$ERROR" != 0 ]]
