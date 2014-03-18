@@ -3,6 +3,7 @@
 if [[ $# != 2 ]]
 then
 	echo "Usage: $0 app.xml output.apk"
+	echo "Or     $0 -install file.apk"
 	exit 1
 fi
 
@@ -13,18 +14,32 @@ xml="$1"
 apk="$2"
 
 adt=$apkdir/airsdk/adt
-cert=$apkdir/cert.pfx
-storepass=$(cat $apkdir/storepass.txt)
-files=$($airtools/appcontents.py "$xml")
-#files="game.swf 36x36-border.png 48x48-border.png 72x72-border.png"
 
-airversion=$($adt -version)
+if [[ "$xml" != "-install" ]]
+then
+	cert=$apkdir/cert.pfx
+	storepass=$(cat $apkdir/storepass.txt)
+	files=$($airtools/appcontents.py "$xml")
+	#files="game.swf 36x36-border.png 48x48-border.png 72x72-border.png"
 
-#cert=android-cert.pfx
+	#airversion=$($adt -version)
 
-target=apk
-#target=apk-captive-runtime
+	#cert=android-cert.pfx
 
-#AMAZON="-airDownloadURL http://www.amazon.com/gp/mas/dl/android?p=com.adobe.air"
+	#target=apk
+	target=apk-captive-runtime
+	#target=apk-debug
+	#target=apk-captive-runtime
 
-"$adt" -package -target $target $AMAZON -storetype pkcs12 -keystore "$cert" -storepass "$storepass" "$apk" "$xml" $files
+	#AMAZON="-airDownloadURL http://www.amazon.com/gp/mas/dl/android?p=com.adobe.air"
+
+	#DEBUG="-connect 192.168.0.16"
+
+	"$adt" -package -target $target $DEBUG $AMAZON -storetype pkcs12 -keystore "$cert" -storepass "$storepass" "$apk" "$xml" $files
+fi
+
+#"$adt" -installApp -platform android -package "$apk"
+
+#"$adt" -launchApp -platform android -appid APP-ID-HERE
+
+adb install -r "$apk"
