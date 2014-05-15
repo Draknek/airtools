@@ -34,7 +34,11 @@ then
 	#AMAZON="-airDownloadURL http://www.amazon.com/gp/mas/dl/android?p=com.adobe.air"
 
 	#DEBUG="-connect 192.168.0.16"
-
+	#DEBUG=-listen
+	
+	#adb forward tcp:7936 tcp:7936
+	#fdb -p 7936
+	
 	"$adt" -package -target $target $DEBUG $AMAZON -storetype pkcs12 -keystore "$cert" -storepass "$storepass" "$apk" "$xml" $files
 fi
 
@@ -43,3 +47,7 @@ fi
 #"$adt" -launchApp -platform android -appid APP-ID-HERE
 
 adb install -r "$apk"
+
+appid=$(aapt dump badging "$apk" | grep package | awk '{print $2}' | sed s/name=//g | sed s/\'//g)
+
+adb shell am start -n ${appid}/.AppEntry
