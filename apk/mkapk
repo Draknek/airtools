@@ -13,11 +13,22 @@ airtools="$apkdir/.."
 xml="$1"
 apk="$2"
 
-adt=$apkdir/airsdk/adt
+if [[ "$OSTYPE" == 'cygwin' ]]
+then
+	adt="$apkdir/airsdk/adt.bat"
+else
+	adt="$apkdir/airsdk/adt"
+fi
 
 if [[ "$xml" != "-install" ]]
 then
-	cert=$apkdir/cert.pfx
+	cert="$apkdir/cert.pfx"
+	
+	if [[ "$OSTYPE" == 'cygwin' ]]
+	then
+		cert=$(cygpath -w "$cert")
+	fi
+	
 	storepass=$(cat $apkdir/storepass.txt)
 	files=$($airtools/appcontents.py "$xml")
 	#files="game.swf 36x36-border.png 48x48-border.png 72x72-border.png"
