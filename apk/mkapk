@@ -51,6 +51,11 @@ then
 	#fdb -p 7936
 	
 	"$adt" -package -target $target $DEBUG $AMAZON -storetype pkcs12 -keystore "$cert" -storepass "$storepass" "$apk" "$xml" $files
+	
+	if [ $? -ne 0 ]
+	then
+		exit
+	fi
 fi
 
 #"$adt" -installApp -platform android -package "$apk"
