@@ -62,8 +62,15 @@ fi
 
 #"$adt" -launchApp -platform android -appid APP-ID-HERE
 
-adb install -r "$apk"
+if [[ $(adb devices | wc -l) -gt 2 ]]
+then
+	echo Installing
+	
+	adb install -r "$apk"
 
-appid=$(aapt dump badging "$apk" | grep package | awk '{print $2}' | sed s/name=//g | sed s/\'//g)
+	appid=$(aapt dump badging "$apk" | grep package | awk '{print $2}' | sed s/name=//g | sed s/\'//g)
 
-adb shell am start -n ${appid}/.AppEntry
+	adb shell am start -n ${appid}/.AppEntry
+else
+	echo No devices connected
+fi
